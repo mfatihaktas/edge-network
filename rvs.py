@@ -52,6 +52,66 @@ class Exp(RV):
 	def sample(self):
 		return self.D + random.expovariate(self.mu)
 
+class TPareto(RV): # Truncated
+	def __init__(self, l, u, a):
+		super().__init__(l_l=l, u_l=u)
+		self.l = l
+		self.u = u
+		self.a = a
+
+	def __repr__(self):
+		return "TPareto(l= {}, u= {}, a= {})".format(self.l, self.u, self.a)
+
+	def to_latex(self):
+		return r'TPareto($\min= {}$, $\max= {}$, $\alpha= {}$)'.format(self.l, self.u, self.a)
+
+	def pdf(self, x):
+		if x < self.l: return 0
+		elif x >= self.u: return 0
+		else:
+			return self.a*self.l**self.a * 1/x**(self.a+1) / (1 - (self.l/self.u)**self.a)
+
+	def cdf(self, x):
+		if x < self.l: return 0
+		elif x >= self.u: return 1
+		else:
+			return (1 - (self.l/x)**self.a)/(1 - (self.l/self.u)**self.a)
+
+	def tail(self, x):
+		return 1 - self.cdf(x)
+
+	def mean(self):
+		return self.moment(1)
+
+	def std(self):
+		return math.sqrt(self.moment(2) - self.mean()**2)
+
+	def moment(self, k):
+		if k == self.a:
+			return math.log(self.u_l/self.l)
+		else:
+			try:
+				r = self.l/self.u
+				return self.a*self.l**k/(self.a-k) * \
+							 (1 - r**(self.a-k))/(1 - r**self.a)
+			except:
+				# x = math.log(self.l) - math.log(self.u)
+				# return self.a*self.l**k/(self.a-k) * \
+				#       (1 - math.exp((self.a-k)*x) )/(1 - math.exp(self.a*x) )
+				r = self.l/self.u
+				log(INFO, "", r=r, a=self.a, k=k)
+				return self.a*self.l**k/(self.a-k) * \
+							 (r**k - r**self.a)/(r**k - r**(self.a + k) )
+
+	def sample(self):
+		r = random.uniform(0, 1)
+		s = self.l*(1 - r*(1-(self.l/self.u)**self.a) )**(-1/self.a)
+		if s < self.l or s > self.u:
+			log(ERROR, "illegal sample! s= {}".format(s) )
+			return None
+		return s
+
+
 class SumOfRVs(RV):
 	def __init__(self, rv_l):
 		super().__init__(l_l=sum(rv.l_l for rv in rv_l), u_l=sum(rv.u_l for rv in rv_l))

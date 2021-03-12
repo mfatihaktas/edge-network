@@ -36,9 +36,10 @@ def exp_interarrival_dist_2qs():
 	log(INFO, "Arrival to Q round-robin", EW=EW)
 
 def exp_interarrival_dist():
-	num_tasks = 10000
-	S = Exp(10)
-	X = Exp(35)
+	num_tasks = 10000*10
+	S = Exp(0.1)
+	# X = Exp(35)
+	X = TPareto(1, 20, 1.2)
 	log(INFO, "", S=S, X=X)
 
 	N = 12
