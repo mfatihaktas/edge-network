@@ -1,3 +1,5 @@
+import random
+
 class RV(): # Random Variable
 	def __init__(self, l_l, u_l):
 		self.l_l = l_l
@@ -49,3 +51,29 @@ class Exp(RV):
 
 	def sample(self):
 		return self.D + random.expovariate(self.mu)
+
+class SumOfRVs(RV):
+	def __init__(self, rv_l):
+		super().__init__(l_l=sum(rv.l_l for rv in rv_l), u_l=sum(rv.u_l for rv in rv_l))
+		self.rv_l = rv_l
+
+	def __repr__(self):
+		return r'SumOfRVs(rv_l= {})'.format(self.rv_l)
+
+	def sample(self):
+		return sum(rv.sample() for rv in self.rv_l)
+
+class CycleOverRVs(RV):
+	def __init__(self, rv_l):
+		super().__init__(l_l=min(rv.l_l for rv in rv_l), u_l=max(rv.u_l for rv in rv_l))
+		self.rv_l = rv_l
+
+		self.cur_i = 0
+
+	def __repr__(self):
+		return r'CycleOverRVs(rv_l= {})'.format(self.rv_l)
+
+	def sample(self):
+		s = self.rv_l[self.cur_i].sample()
+		self.cur_i = self.cur_i % len(self.rv_l)
+		return s

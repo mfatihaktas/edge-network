@@ -36,9 +36,11 @@ def blog(level: int, **kwargs):
 
 def blog(**kwargs):
 	for k, v in kwargs.items():
-		print("  {}=\n{}".format(k, pprint.pformat(v) ) )
+		print("  {}= {}".format(k, pprint.pformat(v) ) )
 
 # ###############################  Sim log  ############################### #
+SLOG_LEVEL = 3
+
 def slog(level: int, env, caller: str, action: str, affected, **kwargs):
 	"""
 	Parameters
@@ -48,9 +50,9 @@ def slog(level: int, env, caller: str, action: str, affected, **kwargs):
 	action= string
 	affected= any -- whatever component being acted on/with e.g., packet
 	"""
-	if LOG_LEVEL <= level:
+	if SLOG_LEVEL <= level:
 		print("{} t: {:.2f}] {} {}\n\t{}".format(str(level), env.now, caller, action, affected) )
-		blog(kwargs)
+		blog(**kwargs)
 
 # ###############################  Assert  ############################### #
 def check(condition: bool, message: str, **kwargs):
