@@ -1,4 +1,7 @@
-import random
+import random, scipy, math
+import scipy.integrate
+
+from debug_utils import *
 
 class RV(): # Random Variable
 	def __init__(self, l_l, u_l):
@@ -111,7 +114,6 @@ class TPareto(RV): # Truncated
 			return None
 		return s
 
-
 class SumOfRVs(RV):
 	def __init__(self, rv_l):
 		super().__init__(l_l=sum(rv.l_l for rv in rv_l), u_l=sum(rv.u_l for rv in rv_l))
@@ -137,3 +139,117 @@ class CycleOverRVs(RV):
 		s = self.rv_l[self.cur_i].sample()
 		self.cur_i = self.cur_i % len(self.rv_l)
 		return s
+
+# ################################  utils  ################################ #
+
+## Pr{a < X < b}
+def Pr_X(X, a=None, b=None):
+	if a is None and b is None:
+		return 1
+
+	if a is not None and b is not None:
+		check(a < b, "a= {} < b= {} should have hold!".format(a, b))
+
+	low = X.l_l if a is None else max(X.l_l, a)
+	high = X.u_l if b is None else min(X.u_l, b)
+	Pr, _ = scipy.integrate.quad(lambda y: X.pdf(y), low, high)
+	return Pr
+
+## Pr{a < X < right_boundary (?)} = prob
+def right_boundary_forGivenPr(X, a, prob):
+	if Pr_X(X, a) <= prob:
+		log(WARNING, "Cannot find the right boundary, returning the max possible value.", X=X, a=a, prob=prob)
+		return X.u_l
+
+	l = a
+	r = (a + 1) * 10**3
+	while Pr_X(X, a, r) < prob:
+		r *= 10
+	log(DEBUG, "Starting binary search", l=l, r=r)
+
+	while (r - l > 0.01):
+		m = (l + r)/2
+		log(DEBUG, "", m=m)
+		if Pr_X(X, a, m) < prob:
+			l = m
+		else:
+			r = m
+
+	return (l + r)/2
+
+def test_right_boundary_forGivenPr():
+	X = Exp(1)
+	log(INFO, "", X=X)
+
+	a = 0.2
+	prob = 0.3
+	b = right_boundary_forGivenPr(X, a, prob)
+	prob_ = Pr_X(X, a, b)
+	log(INFO, "", a=a, b=b, prob=prob, prob_=prob_)
+
+def intervals_for_probs(X, prob_l):
+	check(X.l_l > float('-Inf'), "Lower limit cannot be -inf.")
+	check(sum(prob_l) == 1, "Probabilities should sum to 1.")
+
+	interval_l = []
+	a = X.l_l
+	for prob in prob_l[:-1]:
+		b = right_boundary_forGivenPr(X, a, prob)
+		interval_l.append((a, b))
+		a = b
+		log(DEBUG, "", a=a, b=b, prob=prob)
+		interval_l.append((a, min(float('Inf'), X.u_l)))
+
+	return interval_l
+
+def test_intervals_for_probs():
+	X = Exp(1)
+	log(INFO, "", X=X)
+
+	prob_l = [0.2, 0.8]
+	interval_l = intervals_for_probs(X, prob_l)
+	log(INFO, "", prob_l=prob_l, interval_l=interval_l)
+
+## E[X^i | a < X < b]
+def moment(X, i, a=None, b=None):
+	if a is None and b is None:
+		return X.moment(i)
+
+	if a is not None and b is not None:
+		check(a < b, "a < b should hold!")
+
+	low = X.l_l if a is None else max(X.l_l, a)
+	high = X.u_l if b is None else min(X.u_l, b)
+	r, abserr = scipy.integrate.quad(lambda y: y**i*X.pdf(y), low, high)
+	Pr_X_between_low_high, _ = scipy.integrate.quad(lambda y: X.pdf(y), low, high)
+	check(Pr_X_between_low_high != 0, "Pr_X_between_low_high cannot be 0!")
+
+	return r / Pr_X_between_low_high
+
+def mean(X, a=None, b=None):
+	return moment(X, 1, a, b)
+
+def test_moment():
+	X = Exp(1)
+	EX = mean(X)
+
+	low, mid = 0.2, 0.5
+	EX_low = moment(X, 1, b=low)
+	Pr_low = Pr_X(X, b=low)
+	log(INFO, "", EX_low=EX_low, Pr_low=Pr_low)
+
+	EX_mid = moment(X, 1, a=low, b=mid)
+	Pr_mid = Pr_X(X, a=low, b=mid)
+	log(INFO, "", EX_mid=EX_mid, Pr_mid=Pr_mid)
+
+	EX_high = moment(X, 1, a=mid)
+	Pr_high = Pr_X(X, a=mid)
+	log(INFO, "", EX_high=EX_high, Pr_high=Pr_high)
+
+	EX_total = Pr_low*EX_low + Pr_mid*EX_mid + Pr_high*EX_high
+	log(INFO, "", EX=EX, EX_total=EX_total)
+
+if __name__ == '__main__':
+	# test_moment()
+	# test_right_boundary_forGivenPr()
+	test_intervals_for_probs()

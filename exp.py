@@ -3,50 +3,30 @@ import numpy as np
 from sim_objs import *
 from rvs import *
 
-def sim_EW(X, S, arrival_slicer=None, num_tasks=10000):
+def sim_EW(X, S, V, num_qs, to_which_q, num_tasks):
 	env = simpy.Environment()
 	s = Sink(0, env, num_tasks)
-	q = FCFS(0, env, out=s)
-	TaskGen(env, interarrival_time_rv=X, serv_time_rv=S, out=q, arrival_slicer=arrival_slicer)
+	q_l = [FCFS(0, env, out=s) for _ in range(num_qs)]
+	js = JobSplitter(0, env, q_l, to_which_q)
+	JobGen(env, interarrival_time_rv=X, size_bits_rv=S, serv_time_rv=V, out=js)
 	env.run(until=s.wait_forAllTasks)
-	log(INFO, "Average load= {}".format(q.load()))
+	log(INFO, "Average load= {}".format((q.load() for q in q_l)))
 
-	return np.mean(q.wait_time_l)
-
-def exp_interarrival_dist_2qs():
-	num_tasks = 10000
-	S = Exp(10)
-	X = Exp(18)
-	log(INFO, "", S=S, X=X)
-
-	def arrival_slicer():
-		return True if random.uniform(0, 1) < 0.5 else False
-	EW = sim_EW(X, S, arrival_slicer, num_tasks)
-	log(INFO, "Arrival to Q with probability 0.5", EW=EW)
-
-	# rv_l = [Exp(8), Exp(8)]
-	# X = SumOfRVs(rv_l)
-	count = 0
-	def arrival_slicer():
-		nonlocal count
-		s = True if count == 0 else False
-		count = (count + 1) % 2
-		return s
-	EW = sim_EW(X, S, arrival_slicer, num_tasks)
-	log(INFO, "Arrival to Q round-robin", EW=EW)
+	log(INFO, "Average wait time= {}".format((np.mean(q.wait_time_l) for q in q_l)))
 
 def exp_interarrival_dist():
-	num_tasks = 10000*10
-	S = Exp(0.1)
-	# X = Exp(35)
+	num_qs = 3
+	num_tasks = num_qs*1000
 	X = TPareto(1, 20, 1.2)
-	log(INFO, "", S=S, X=X)
+	S = Exp(0.1)
+	V = Exp(0.1)
+	log(INFO, "", X=X, S=S)
 
-	N = 12
-	n = 3
+	# total_load = 1/X.mean(1) * S.mean(1)
+	load_frac_l = [1/num_qs for _ in range(num_qs)]
 
 	## Random
-	def arrival_slicer():
+	def to_which_q():
 		return True if random.uniform(0, 1) < n/N else False
 	EW = sim_EW(X, S, arrival_slicer, num_tasks)
 	log(INFO, "Random w.p. {}".format(n/N), EW=EW)

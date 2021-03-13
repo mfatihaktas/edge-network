@@ -1,6 +1,5 @@
 import inspect, pprint
 
-
 # #################################  Log  ################################# #
 LOG_LEVEL = 0
 
@@ -9,6 +8,13 @@ DEBUG = 1
 WARNING = 2
 ERROR = 3
 
+level_label_m = {INFO: "INFO", DEBUG: "DEBUG", WARNING: "WARNING", ERROR: "ERROR"}
+
+def level_to_label(level):
+	if level in level_label_m:
+		return level_label_m[level]
+	return str(level)
+
 def log(level: int, message: str, **kwargs):
 	if LOG_LEVEL <= level:
 		try:
@@ -16,7 +22,7 @@ def log(level: int, message: str, **kwargs):
 		except IndexError:
 			funcname = ''
 
-		print("{}] {}:: {}".format(str(level), funcname, message))
+		print("{}] {}:: {}".format(level_to_label(level), funcname, message))
 		blog(**kwargs)
 
 # Always log
@@ -26,7 +32,7 @@ def alog(level: int, message: str, **kwargs):
 	except IndexError:
 		funcname = ''
 
-	print("{}] {}:: {}".format(str(level), funcname, message))
+	print("{}] {}:: {}".format(level_to_label(level), funcname, message))
 	blog(**kwargs)
 
 # Block log
@@ -41,21 +47,26 @@ def blog(**kwargs):
 # ###############################  Sim log  ############################### #
 SLOG_LEVEL = 3
 
+"""
+	env: simpy.Environment
+	caller: string -- name of the sim component acting
+	action: string
+	affected: any -- whatever component being acted on/with e.g., packet
+"""
 def slog(level: int, env, caller: str, action: str, affected, **kwargs):
-	"""
-	Parameters
-	----------
-	env= simpy.Environment
-	caller= string -- name of the sim component acting
-	action= string
-	affected= any -- whatever component being acted on/with e.g., packet
-	"""
 	if SLOG_LEVEL <= level:
-		print("{} t: {:.2f}] {} {}\n\t{}".format(str(level), env.now, caller, action, affected) )
+		print("{} t: {:.2f}] {} {}\n\t{}".format(level_to_label(level), env.now, caller, action, affected) )
 		blog(**kwargs)
 
 # ###############################  Assert  ############################### #
 def check(condition: bool, message: str, **kwargs):
 	if not condition:
-		alog(0, message, **kwargs)
+		try:
+			funcname = inspect.stack()[1][3]
+		except IndexError:
+			funcname = ''
+
+		print("ERROR] {}:: {}".format(funcname, message))
+		blog(**kwargs)
+
 		raise AssertionError()

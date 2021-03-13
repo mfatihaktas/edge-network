@@ -1,20 +1,21 @@
 from debug_utils import *
 import simpy
 
-class Task():
-	def __init__(self, _id, serv_time):
+class Job():
+	def __init__(self, _id, size_bits, serv_time):
 		self._id = _id
+		self.size_bits = size_bits
 		self.serv_time = serv_time
 
 	def __repr__(self):
-		return "Task[id= {}, serv_time= {}]".format(self._id, self.serv_time)
+		return "Job[id= {}, size_bits= {}, serv_time= {}]".format(self._id, self.size_bits, self.serv_time)
 
-class TaskGen(object):
-	def __init__(self, env, interarrival_time_rv, serv_time_rv, out, arrival_slicer=None, **kwargs):
+class JobGen(object):
+	def __init__(self, env, interarrival_time_rv, size_bits_rv, serv_time_rv, out, **kwargs):
 		self.env = env
 		self.interarrival_time_rv = interarrival_time_rv
+		self.size_bits_rv = size_bits_rv
 		self.serv_time_rv = serv_time_rv
-		self.arrival_slicer = arrival_slicer
 		self.out = out
 
 		self.num_jobs_sent = 0
@@ -26,14 +27,10 @@ class TaskGen(object):
 			# random.expovariate(self.ar)
 			yield self.env.timeout(self.interarrival_time_rv.sample())
 
-			send = False
-			if self.arrival_slicer is not None:
-				send = self.arrival_slicer()
-
-			if send:
-				self.num_jobs_sent += 1
-				self.out.put(Task(_id = self.num_jobs_sent,
-													serv_time = self.serv_time_rv.sample()))
+			self.num_jobs_sent += 1
+			self.out.put(Job(_id = self.num_jobs_sent,
+											 size_bits = self.size_bits_rv.sample(),
+											 serv_time = self.serv_time_rv.sample()))
 
 class Q(object):
 	def __init__(self, _id, env):
@@ -41,8 +38,9 @@ class Q(object):
 		self.env = env
 
 class FCFS(Q): # First Come First Serve
-	def __init__(self, _id, env, out=None):
+	def __init__(self, _id, env, speed=1, out=None):
 		super().__init__(_id, env)
+		self.speed = speed
 		self.out = out
 
 		self.store = simpy.Store(env)
@@ -70,8 +68,9 @@ class FCFS(Q): # First Come First Serve
 			self.idle_time += self.env.now - idle_start
 
 			busy_start = self.env.now
-			slog(DEBUG, self.env, self, "will serve", task)
-			yield self.env.timeout(task.serv_time)
+			t = task.serv_time/speed
+			slog(DEBUG, self.env, self, "will serve for t= {}".format(t), task)
+			yield self.env.timeout(t)
 			slog(DEBUG, self.env, self, "done serving", task)
 			self.busy_time += self.env.now - busy_start
 
@@ -80,27 +79,45 @@ class FCFS(Q): # First Come First Serve
 				self.out.put(task)
 
 class Sink():
-	def __init__(self, _id, env, num_tasks):
+	def __init__(self, _id, env, num_jobs):
 		self._id = _id
 		self.env = env
-		self.num_tasks = num_tasks
+		self.num_jobs = num_jobs
 
 		self.store = simpy.Store(env)
-		self.num_tasksRecvedSoFar = 0
+		self.num_jobsRecvedSoFar = 0
 
 		self.wait_forAllTasks = env.process(self.run())
 
 	def __repr__(self):
-		return "Sink[_id= {}, num_tasks= {}]".format(self._id, self.num_tasks)
+		return "Sink[_id= {}, num_jobs= {}]".format(self._id, self.num_jobs)
 
 	def put(self, task):
-		slog(DEBUG, self.env, self, "recved, num_tasksRecvedSoFar= {}".format(self.num_tasksRecvedSoFar), task)
+		slog(DEBUG, self.env, self, "recved, num_jobsRecvedSoFar= {}".format(self.num_jobsRecvedSoFar), task)
 		return self.store.put(task)
 
 	def run(self):
 		while True:
 			task = yield self.store.get()
 
-			self.num_tasksRecvedSoFar += 1
-			if self.num_tasksRecvedSoFar >= self.num_tasks:
+			self.num_jobsRecvedSoFar += 1
+			if self.num_jobsRecvedSoFar >= self.num_jobs:
 				return
+
+class JobSplitter():
+	def __init__(self, _id, env, q_l, to_which_q):
+		self._id = _id
+		self.env = env
+		self.q_l = q_l
+		self.to_which_q = to_which_q
+
+	def __repr__(self):
+		return "JobSplitter[_id= {}]".format(self._id)
+
+	def put(self, job):
+		slog(DEBUG, self.env, self, "recved", job)
+
+		i = self.to_which_q(job)
+		check(i < len(self.q_l), "i= {} should have been < len(q_l)= {}".format(i, len(self.q_l)))
+
+		return self.q_l[i].put(task)

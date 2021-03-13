@@ -5,8 +5,8 @@ PY=python3
 
 if [ $1 = 'e' ]; then
   $PY exp.py
-elif [ $1 = 'x' ]; then
-  echo "N/A"
+elif [ $1 = 'r' ]; then
+  $PY rvs.py
 else
   echo "Arg did not match!"
 fi
