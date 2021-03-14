@@ -56,27 +56,27 @@ class FCFS(Q): # First Come First Serve
 	def load(self):
 		return self.busy_time / (self.busy_time + self.idle_time)
 
-	def put(self, task):
-		task.arrival_time = self.env.now
-		slog(DEBUG, self.env, self, "recved", task)
-		return self.store.put(task)
+	def put(self, job):
+		job.arrival_time = self.env.now
+		slog(DEBUG, self.env, self, "recved", job)
+		return self.store.put(job)
 
 	def run(self):
 		while True:
 			idle_start = self.env.now
-			task = yield self.store.get()
+			job = yield self.store.get()
 			self.idle_time += self.env.now - idle_start
 
 			busy_start = self.env.now
-			t = task.serv_time/speed
-			slog(DEBUG, self.env, self, "will serve for t= {}".format(t), task)
+			t = job.serv_time / self.speed
+			slog(DEBUG, self.env, self, "will serve for t= {}".format(t), job)
 			yield self.env.timeout(t)
-			slog(DEBUG, self.env, self, "done serving", task)
+			slog(DEBUG, self.env, self, "done serving", job)
 			self.busy_time += self.env.now - busy_start
 
-			self.wait_time_l.append(self.env.now - task.arrival_time)
+			self.wait_time_l.append(self.env.now - job.arrival_time)
 			if self.out is not None:
-				self.out.put(task)
+				self.out.put(job)
 
 class Sink():
 	def __init__(self, _id, env, num_jobs):
@@ -87,18 +87,18 @@ class Sink():
 		self.store = simpy.Store(env)
 		self.num_jobsRecvedSoFar = 0
 
-		self.wait_forAllTasks = env.process(self.run())
+		self.wait_forAllJobs = env.process(self.run())
 
 	def __repr__(self):
 		return "Sink[_id= {}, num_jobs= {}]".format(self._id, self.num_jobs)
 
-	def put(self, task):
-		slog(DEBUG, self.env, self, "recved, num_jobsRecvedSoFar= {}".format(self.num_jobsRecvedSoFar), task)
-		return self.store.put(task)
+	def put(self, job):
+		slog(DEBUG, self.env, self, "recved, num_jobsRecvedSoFar= {}".format(self.num_jobsRecvedSoFar), job)
+		return self.store.put(job)
 
 	def run(self):
 		while True:
-			task = yield self.store.get()
+			job = yield self.store.get()
 
 			self.num_jobsRecvedSoFar += 1
 			if self.num_jobsRecvedSoFar >= self.num_jobs:
@@ -120,4 +120,4 @@ class JobSplitter():
 		i = self.to_which_q(job)
 		check(i < len(self.q_l), "i= {} should have been < len(q_l)= {}".format(i, len(self.q_l)))
 
-		return self.q_l[i].put(task)
+		return self.q_l[i].put(job)

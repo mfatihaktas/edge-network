@@ -1,12 +1,12 @@
 import inspect, pprint
 
 # #################################  Log  ################################# #
-LOG_LEVEL = 0
-
-INFO = 0
-DEBUG = 1
+DEBUG = 0
+INFO = 1
 WARNING = 2
 ERROR = 3
+
+LOG_LEVEL = INFO
 
 level_label_m = {INFO: "INFO", DEBUG: "DEBUG", WARNING: "WARNING", ERROR: "ERROR"}
 

@@ -1,5 +1,6 @@
 import random, scipy, math
 import scipy.integrate
+import scipy.stats
 
 from debug_utils import *
 
@@ -114,6 +115,23 @@ class TPareto(RV): # Truncated
 			return None
 		return s
 
+class DiscreteRV():
+	def __init__(self, p_l, v_l):
+		self.p_l = p_l
+		self.v_l = v_l
+		self.dist = scipy.stats.rv_discrete(name='discrete', values=(v_l, p_l))
+
+	def __repr__(self):
+		return 'DiscreteRV:\n' + \
+			'\t p_l= {}\n'.format(self.p_l) + \
+			'\t rv_l= {}\n'.format(self.rv_l)
+
+	def mean(self):
+		return self.dist.mean()
+
+	def sample(self):
+		return self.dist.rvs()
+
 class SumOfRVs(RV):
 	def __init__(self, rv_l):
 		super().__init__(l_l=sum(rv.l_l for rv in rv_l), u_l=sum(rv.u_l for rv in rv_l))
@@ -169,7 +187,7 @@ def right_boundary_forGivenPr(X, a, prob):
 
 	while (r - l > 0.01):
 		m = (l + r)/2
-		log(DEBUG, "", m=m)
+		# log(DEBUG, "", m=m)
 		if Pr_X(X, a, m) < prob:
 			l = m
 		else:
@@ -196,9 +214,9 @@ def intervals_for_probs(X, prob_l):
 	for prob in prob_l[:-1]:
 		b = right_boundary_forGivenPr(X, a, prob)
 		interval_l.append((a, b))
-		a = b
 		log(DEBUG, "", a=a, b=b, prob=prob)
-		interval_l.append((a, min(float('Inf'), X.u_l)))
+		a = b
+	interval_l.append((a, min(float('Inf'), X.u_l)))
 
 	return interval_l
 
@@ -208,7 +226,8 @@ def test_intervals_for_probs():
 
 	prob_l = [0.2, 0.8]
 	interval_l = intervals_for_probs(X, prob_l)
-	log(INFO, "", prob_l=prob_l, interval_l=interval_l)
+	prob_computed_l = [Pr_X(X, a, b) for (a, b) in interval_l]
+	log(INFO, "", prob_l=prob_l, interval_l=interval_l, prob_computed_l=prob_computed_l)
 
 ## E[X^i | a < X < b]
 def moment(X, i, a=None, b=None):
