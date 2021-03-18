@@ -1,5 +1,6 @@
-from debug_utils import *
 import simpy
+
+from debug_utils import *
 
 class Job():
 	def __init__(self, _id, size_bits, serv_time):
@@ -50,6 +51,8 @@ class FCFS(Q): # First Come First Serve
 		self.busy_time = 0
 		self.idle_time = 0
 
+		self.num_served = 0
+
 	def __repr__(self):
 		return "FCFS[_id= {}]".format(self._id)
 
@@ -67,14 +70,15 @@ class FCFS(Q): # First Come First Serve
 			job = yield self.store.get()
 			self.idle_time += self.env.now - idle_start
 
+			self.wait_time_l.append(self.env.now - job.arrival_time)
 			busy_start = self.env.now
-			t = job.serv_time / self.speed
+			t = job.size_bits / self.speed
 			slog(DEBUG, self.env, self, "will serve for t= {}".format(t), job)
 			yield self.env.timeout(t)
 			slog(DEBUG, self.env, self, "done serving", job)
+			self.num_served += 1
 			self.busy_time += self.env.now - busy_start
 
-			self.wait_time_l.append(self.env.now - job.arrival_time)
 			if self.out is not None:
 				self.out.put(job)
 
@@ -104,7 +108,7 @@ class Sink():
 			if self.num_jobsRecvedSoFar >= self.num_jobs:
 				return
 
-class JobSplitter():
+class JobDispatcher():
 	def __init__(self, _id, env, q_l, to_which_q):
 		self._id = _id
 		self.env = env
@@ -112,7 +116,7 @@ class JobSplitter():
 		self.to_which_q = to_which_q
 
 	def __repr__(self):
-		return "JobSplitter[_id= {}]".format(self._id)
+		return "JobDispatcher[_id= {}]".format(self._id)
 
 	def put(self, job):
 		slog(DEBUG, self.env, self, "recved", job)
